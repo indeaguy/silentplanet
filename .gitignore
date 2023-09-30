@@ -1,0 +1,22 @@
+# Node.js
+**/node_modules/
+npm-debug.log
+yarn-error.log
+
+# Rust/Cargo
+target/
+Cargo.toml.orig
+
+# IDE/Editor-specific files (adjust as needed)
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Compiled binaries (adjust for your Rust project)
+*.rsproj
+**/target/debug/
+**/target/release/
+
+# Environment-specific files (e.g., for dotenv)
+.env

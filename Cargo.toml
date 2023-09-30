@@ -1,0 +1,23 @@
+[package]
+name = "globetree"
+version = "0.1.0"
+authors = ["David McGuigan <davide.mcguigan@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+# Rocket is a web framework for Rust that makes it simple to write fast, secure web applications without sacrificing flexibility, usability, or type safety.
+# We're using version 0.4 here.
+rocket = "0.4"
+
+# rocket_contrib contains optional functionality for the Rocket web framework.
+# The "serve" feature enables the serving of static files, which is what we're using it for here.
+# Please note that you should only enable the features you are using (for smaller compile times and binary sizes)
+rocket_contrib = { version = "0.4", features = ["serve"] }
+
+# It's important to keep your dependencies up-to-date for the latest features and security fixes. 
+# However, be careful with version updates as they can potentially introduce breaking changes. 
+# Always test your application thoroughly after updating a dependency.
+
+# Use `cargo update` to update your dependencies to the latest version that complies with the version constraints listed here.
+# Use `cargo outdated` (requires cargo-outdated plugin) to see which dependencies have updates available.
+# Use `cargo audit` (requires cargo-audit plugin) to scan your dependencies for known security vulnerabilities.
