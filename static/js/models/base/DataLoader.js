@@ -15,111 +15,118 @@ export class DataLoader {
     return data;
   }
 
-  mapDataToSphere(data, radius, color, rise = 0) {
-    // Calculate the altitude from the radius and rise.
-    let altitude = radius + rise;
+  subdivideTriangle(triangleVertices, depth, radius, rise, meshes, color, minEdgeLength) {
+    const edgeLengths = [
+        triangleVertices[0].distanceTo(triangleVertices[1]),
+        triangleVertices[1].distanceTo(triangleVertices[2]),
+        triangleVertices[2].distanceTo(triangleVertices[0])
+    ];
+    const longestEdge = Math.max(...edgeLengths);
 
-    // Create an empty array to store mesh objects.
-    let meshes = [];
+    // Check against the minimum edge length
+    if (longestEdge < minEdgeLength) {
+        depth = 0;
+    }
 
-    // Loop through features in the data.
-    for (let feature of data.features) {
-      if (feature.geometry.type !== 'Polygon' && feature.geometry.type === 'MultiPolygon') {
-        continue;
+    if (depth <= 0) {
+        // Base case: No more subdivision needed. Create the mesh triangle.
+        const geometry = new THREE.BufferGeometry();
+        const positions = triangleVertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex([0, 1, 2]);
+        const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: false });
+        const mesh = new THREE.Mesh(geometry, material);
+        meshes.push(mesh);
+        return;
+    }
+  
+    // Calculate midpoints and ensure they lie on the surface of the sphere.
+    const edgeMidpoints = [
+        triangleVertices[0].clone().lerp(triangleVertices[1], 0.5).normalize().multiplyScalar(radius + rise),
+        triangleVertices[1].clone().lerp(triangleVertices[2], 0.5).normalize().multiplyScalar(radius + rise),
+        triangleVertices[2].clone().lerp(triangleVertices[0], 0.5).normalize().multiplyScalar(radius + rise)
+    ];
+  
+    // Define the new triangles.
+    const newTriangles = [
+        [triangleVertices[0], edgeMidpoints[0], edgeMidpoints[2]],
+        [edgeMidpoints[0], triangleVertices[1], edgeMidpoints[1]],
+        [edgeMidpoints[1], triangleVertices[2], edgeMidpoints[2]],
+        [edgeMidpoints[2], edgeMidpoints[0], edgeMidpoints[1]]
+    ];
+  
+    // Recursively subdivide each triangle.
+    for (let t of newTriangles) {
+        this.subdivideTriangle(t, depth - 1, radius, rise, meshes, color, minEdgeLength);
+    }
+}
+
+
+
+mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLength = 0.05) {
+  // Calculate the altitude from the radius and rise.
+  let altitude = radius + rise;
+
+  // Create an empty array to store mesh objects.
+  let meshes = [];
+
+  // Helper function to ensure CCW order for a given triangle.
+  function ensureCCW(vertices) {
+      // Using the shoelace formula to calculate the signed area of a triangle.
+      const area = (vertices[1].x - vertices[0].x) * (vertices[2].y - vertices[0].y) - 
+                   (vertices[2].x - vertices[0].x) * (vertices[1].y - vertices[0].y);
+
+      // If the area is negative, the winding is CW and we need to swap vertices.
+      if (area < 0) {
+          const temp = vertices[1];
+          vertices[1] = vertices[2];
+          vertices[2] = temp;
       }
+      return vertices;
+  }
 
-      // Check the geometry type and prepare an array of polygons.
-      let polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+  // Loop through features in the data.
+  for (let feature of data.features) {
+    if (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon') {
+      continue;
+    }
 
-      for (let polygon of polygons) {
-        // Extract the coordinates from the polygon data.
-        let coordinates = polygon[0];
-  
-        // Triangulate the polygon interior.
+    // Check the geometry type and prepare an array of polygons.
+    let polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
 
-        /*
-        using the Earcut library to triangulate a set of 2D coordinates. Let's break it down step by step:
+    for (let polygon of polygons) {
+      // Extract the coordinates from the polygon data.
+      let coordinates = polygon[0];
 
-            coordinates: This is an array of 2D points that define the vertices of a polygon. Each point is represented as an array with two values: [x, y], where x is the horizontal coordinate and y is the vertical coordinate.
+      // Triangulate the polygon interior using Earcut.
+      const triangles = Earcut.triangulate(coordinates.flat());
 
-            .flat(): The .flat() method is used on the coordinates array to convert a multi-dimensional array (possibly an array of arrays) into a flat one-dimensional array. It essentially flattens nested arrays. For example, if you have an array of arrays like [[1, 2], [3, 4], [5, 6]], calling .flat() on it will transform it into [1, 2, 3, 4, 5, 6].
+      // Iterate through the triangle indices and create triangles.
+      for (let i = 0; i < triangles.length; i += 3) {
+        const triangleIndices = [triangles[i], triangles[i + 1], triangles[i + 2]];
 
-            Earcut.triangulate(): This is a function provided by the Earcut library. It takes a flat array of 2D coordinates (in your case, the flattened coordinates array) and performs polygon triangulation. Triangulation is the process of dividing a polygon into triangles such that no two triangles intersect and the triangles collectively cover the entire polygon. The Earcut.triangulate() function returns an array of indices that represent the vertices of these triangles.
+        // Convert triangle coordinates to 3D vectors on the sphere.
+        const triangleVertices = triangleIndices.map((index) => {
+          const vertex = coordinates[index];
+          const latRad = vertex[1] * (Math.PI / 180);
+          const lonRad = -vertex[0] * (Math.PI / 180);
+          const x = radius * Math.cos(latRad) * Math.cos(lonRad);
+          const y = radius * Math.sin(latRad);
+          const z = radius * Math.cos(latRad) * Math.sin(lonRad);
+          return new THREE.Vector3(x, y, z);
+        });
 
-            triangles: The result of the Earcut.triangulate() function is stored in the triangles variable. This will be an array of integers, where each group of three integers represents the indices of the vertices of a triangle in the coordinates array.
+        // Ensure the triangle vertices are in CCW order.
+        const orderedVertices = ensureCCW(triangleVertices);
 
-        In summary, this line of code takes a set of 2D coordinates that define a polygon, flattens them into a one-dimensional array, and then uses the Earcut library to perform triangulation on the polygon, returning an array of triangle vertex indices. These triangles can then be used to create a 3D representation of the polygon or for other geometric calculations.
-        */
-        const triangles = Earcut.triangulate(coordinates.flat());
-  
-        // Iterate through the triangle indices and create triangles.
-        for (let i = 0; i < triangles.length; i += 3) {
-          const triangleIndices = [triangles[i], triangles[i + 1], triangles[i + 2]];
-  
-          // Create an array of vertices for this triangle.
-          const triangleVertices = triangleIndices.map((index) => {
-            const vertex = coordinates[index];
-            const latRad = vertex[1] * (Math.PI / 180);
-            const lonRad = -vertex[0] * (Math.PI / 180);
-            const x = radius * Math.cos(latRad) * Math.cos(lonRad);
-            const y = radius * Math.sin(latRad);
-            const z = radius * Math.cos(latRad) * Math.sin(lonRad);
-            return new THREE.Vector3(x, y, z);
-          });
-  
-          // Create an array of midpoints for the edges.
-          const edgeMidpoints = [
-            triangleVertices[0].clone().lerp(triangleVertices[1], 0.5),
-            triangleVertices[1].clone().lerp(triangleVertices[2], 0.5),
-            triangleVertices[2].clone().lerp(triangleVertices[0], 0.5),
-          ];
-  
-          // Normalize the edge midpoints to the sphere's surface.
-          const normalizedMidpoints = edgeMidpoints.map((midpoint) => {
-            midpoint.normalize().multiplyScalar(radius + rise);
-            return midpoint;
-          });
-  
-          // Create new triangles using the normalized midpoints and original vertices.
-          const newTriangles = [
-            triangleVertices[0], normalizedMidpoints[0], normalizedMidpoints[2],
-            normalizedMidpoints[0], triangleVertices[1], normalizedMidpoints[1],
-            normalizedMidpoints[1], triangleVertices[2], normalizedMidpoints[2],
-            normalizedMidpoints[2], normalizedMidpoints[0], normalizedMidpoints[1],
-          ];
-  
-          // Create a BufferGeometry for the new triangles.
-          const geometry = new THREE.BufferGeometry();
-          const positions = newTriangles.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
-          geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-
-          // @TODO make this better
-
-          /*
-          The line geometry.setIndex([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]); is setting the index buffer for the geometry. In Three.js, a geometry consists of two main components: vertex attributes (e.g., positions, normals, colors) and an index buffer.
-
-          Here's what this line specifically does:
-
-              geometry: This refers to the BufferGeometry instance you are working with. In Three.js, a BufferGeometry represents the geometry of a 3D object and stores various attributes of its vertices.
-
-              setIndex([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]): This method is used to set the index buffer of the geometry. The argument [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] is an array of indices that define the order in which vertices should be connected to create triangles.
-
-          In this case, you are specifying a list of indices that will be used to connect vertices to form triangles. The numbers in the array correspond to the indices of vertices in the vertex buffer of the geometry.
-
-          For example, [0, 1, 2] represents the first triangle and instructs Three.js to connect vertices with indices 0, 1, and 2 in the vertex buffer to create that triangle. Similarly, [3, 4, 5] defines the second triangle, and so on.
-
-          By specifying the index buffer, you can reuse vertices for multiple triangles, which can be more memory-efficient when rendering complex 3D models. It also allows you to describe the geometry of the object more compactly since you don't need to duplicate shared vertices for each triangle they belong to.
-          */
-          geometry.setIndex([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-  
-          // Create a material and mesh for the triangle.
-          const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: true });
-          const mesh = new THREE.Mesh(geometry, material);
-          meshes.push(mesh);
-        }
+        // Use the subdivideTriangle method to handle potential triangle subdivisions.
+        this.subdivideTriangle(orderedVertices, subdivisionDepth, radius, rise, meshes, color, minEdgeLength);
       }
-  
-      return meshes;
     }
   }
+
+  return meshes;
+}
+
+
 }
