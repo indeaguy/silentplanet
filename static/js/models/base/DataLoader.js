@@ -15,7 +15,7 @@ export class DataLoader {
     return data;
   }
 
-  subdivideTriangle(triangleVertices, depth, radius, rise, meshes, color, minEdgeLength) {
+  subdivideTriangle(triangleVertices, depth, radius, rise, meshes, color, minEdgeLength, polygonMesh) {
     const edgeLengths = [
         triangleVertices[0].distanceTo(triangleVertices[1]),
         triangleVertices[1].distanceTo(triangleVertices[2]),
@@ -30,13 +30,18 @@ export class DataLoader {
 
     if (depth <= 0) {
         // Base case: No more subdivision needed. Create the mesh triangle.
-        const geometry = new THREE.BufferGeometry();
-        const positions = triangleVertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setIndex([0, 1, 2]);
-        const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: false });
-        const mesh = new THREE.Mesh(geometry, material);
-        meshes.push(mesh);
+
+        // Check if all vertices of the triangle are inside the polygon
+        // @here.. trying to check if the triangle is in the original polygon. but the polygon is not added to the scene yet to check maybe?
+        //if (triangleVertices.every(vertex => this.isInsidePolygon(vertex, polygonMesh))) {
+          const geometry = new THREE.BufferGeometry();
+          const positions = triangleVertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
+          geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+          geometry.setIndex([0, 1, 2]);
+          const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: true });
+          const mesh = new THREE.Mesh(geometry, material);
+          meshes.push(mesh);
+        //}
         return;
     }
   
@@ -57,7 +62,7 @@ export class DataLoader {
   
     // Recursively subdivide each triangle.
     for (let t of newTriangles) {
-        this.subdivideTriangle(t, depth - 1, radius, rise, meshes, color, minEdgeLength);
+        this.subdivideTriangle(t, depth - 1, radius, rise, meshes, color, minEdgeLength, polygonMesh);
     }
 }
 
@@ -69,21 +74,6 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
 
   // Create an empty array to store mesh objects.
   let meshes = [];
-
-  // Helper function to ensure CCW order for a given triangle.
-  function ensureCCW(vertices) {
-      // Using the shoelace formula to calculate the signed area of a triangle.
-      const area = (vertices[1].x - vertices[0].x) * (vertices[2].y - vertices[0].y) - 
-                   (vertices[2].x - vertices[0].x) * (vertices[1].y - vertices[0].y);
-
-      // If the area is negative, the winding is CW and we need to swap vertices.
-      if (area < 0) {
-          const temp = vertices[1];
-          vertices[1] = vertices[2];
-          vertices[2] = temp;
-      }
-      return vertices;
-  }
 
   // Loop through features in the data.
   for (let feature of data.features) {
@@ -97,6 +87,9 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
     for (let polygon of polygons) {
       // Extract the coordinates from the polygon data.
       let coordinates = polygon[0];
+
+      // create the first polygon mesh with just geojson to compare
+      let polygonMesh = this.createPolygonMesh(coordinates, radius);
 
       // Triangulate the polygon interior using Earcut.
       const triangles = Earcut.triangulate(coordinates.flat());
@@ -117,16 +110,61 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
         });
 
         // Ensure the triangle vertices are in CCW order.
-        const orderedVertices = ensureCCW(triangleVertices);
+        const orderedVertices = this.ensureCCW(triangleVertices);
 
         // Use the subdivideTriangle method to handle potential triangle subdivisions.
-        this.subdivideTriangle(orderedVertices, subdivisionDepth, radius, rise, meshes, color, minEdgeLength);
+        this.subdivideTriangle(orderedVertices, subdivisionDepth, radius, rise, meshes, color, minEdgeLength, polygonMesh);
       }
     }
   }
 
   return meshes;
 }
+
+  // Helper function to ensure CCW order for a given triangle.
+  ensureCCW(vertices) {
+    // Using the shoelace formula to calculate the signed area of a triangle.
+    const area = (vertices[1].x - vertices[0].x) * (vertices[2].y - vertices[0].y) - 
+                 (vertices[2].x - vertices[0].x) * (vertices[1].y - vertices[0].y);
+
+    // If the area is negative, the winding is CW and we need to swap vertices.
+    if (area < 0) {
+        const temp = vertices[1];
+        vertices[1] = vertices[2];
+        vertices[2] = temp;
+    }
+    return vertices;
+}
+
+  // create a polygon with the original geojson for to compare and remove any outside polygons
+  createPolygonMesh(polygonCoords, radius) {
+    const vertices = polygonCoords.map(coord => {
+      const latRad = coord[1] * (Math.PI / 180);
+      const lonRad = -coord[0] * (Math.PI / 180);
+      const x = radius * Math.cos(latRad) * Math.cos(lonRad);
+      const y = radius * Math.sin(latRad);
+      const z = radius * Math.cos(latRad) * Math.sin(lonRad);
+      return new THREE.Vector3(x, y, z);
+    });
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(vertices);
+    geometry.setIndex(Earcut.triangulate(polygonCoords.flat()));
+
+    //const material = new THREE.MeshBasicMaterial({ visible: false });  // invisible as we're only using it for raycasting
+    const material = new THREE.MeshBasicMaterial({ color: 'blue', wireframe: true });
+    return new THREE.Mesh(geometry, material);
+  }
+
+  isInsidePolygon(point, polygonMesh) {
+
+    const raycaster = new THREE.Raycaster();
+    const up = new THREE.Vector3(0, 1, 0); // Up direction for raycasting
+
+    raycaster.set(point, up);
+    const intersects = raycaster.intersectObject(polygonMesh);
+    const doesintersect = intersects.length % 2 === 1;
+    return doesintersect;
+  }
 
 
 }
