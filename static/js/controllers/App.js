@@ -16,10 +16,13 @@ export class App {
 
     this.globe.createSphere();
 
-    const loader = new DataLoader('geojson/usa.geojson');
+    const loader = new DataLoader('geojson/map.geojson');
     loader.loadData().then(data => {
-      const points = loader.mapDataToSphere(data, config.GLOBE.RADIUS, 0xff0000);
-      points.forEach(point => this.renderer.scene.add(point));
+      const result = loader.mapDataToSphere(data, config.GLOBE.RADIUS, 0xff0000);
+      result.meshes.forEach(mesh => this.renderer.scene.add(mesh));
+      
+      // Add the polygonMeshes to the scene for debugging earclipping
+      result.polygonMeshes.forEach(polygonMesh => this.renderer.scene.add(polygonMesh));
     });
 
     this.renderer.renderables.push(this.globe);

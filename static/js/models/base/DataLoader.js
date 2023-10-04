@@ -33,7 +33,14 @@ export class DataLoader {
 
         // Check if all vertices of the triangle are inside the polygon
         // @here.. trying to check if the triangle is in the original polygon. but the polygon is not added to the scene yet to check maybe?
-        //if (triangleVertices.every(vertex => this.isInsidePolygon(vertex, polygonMesh))) {
+      //   const verticesInside = triangleVertices.map(vertex => {
+      //     const isInside = this.isInsidePolygon(vertex, polygonMesh);
+      //     if (isInside)
+      //     console.log(`Vertex at position (${vertex.x}, ${vertex.y}, ${vertex.z}) is inside polygon: ${isInside}`);
+      //     return isInside;
+      // });
+      
+      //if (verticesInside.every(value => value === true)) {
           const geometry = new THREE.BufferGeometry();
           const positions = triangleVertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
           geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -75,6 +82,8 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
   // Create an empty array to store mesh objects.
   let meshes = [];
 
+  let polygonMeshes = []; // Array to store polygonMeshes
+
   // Loop through features in the data.
   for (let feature of data.features) {
     if (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon') {
@@ -90,6 +99,7 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
 
       // create the first polygon mesh with just geojson to compare
       let polygonMesh = this.createPolygonMesh(coordinates, radius);
+      polygonMeshes.push(polygonMesh);
 
       // Triangulate the polygon interior using Earcut.
       const triangles = Earcut.triangulate(coordinates.flat());
@@ -118,7 +128,7 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
     }
   }
 
-  return meshes;
+  return { meshes: meshes, polygonMeshes: polygonMeshes };
 }
 
   // Helper function to ensure CCW order for a given triangle.
