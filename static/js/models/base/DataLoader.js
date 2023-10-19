@@ -16,6 +16,7 @@ export class DataLoader {
   }
 
   subdivideTriangle(triangleVertices, depth, radius, rise, meshes, color, minEdgeLength, polygonMesh) {
+    
     const edgeLengths = [
         triangleVertices[0].distanceTo(triangleVertices[1]),
         triangleVertices[1].distanceTo(triangleVertices[2]),
