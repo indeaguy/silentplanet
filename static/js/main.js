@@ -47,8 +47,14 @@ const CONFIG = {
   },
   POLYGONS: {
     RISE: 0, // how high off the sphere the polygons rise
+    COLOR: 0xff0000, // color of the polygons
     SUBDIVIDE_DEPTH: 3, // how many times to subdivide the polygons
-    MIN_EDGE_LENGTH: 0.5 // minimum edge length of the polygons
+    MIN_EDGE_LENGTH: 0.05, // minimum edge length of the polygons
+    LAYER_OVERRIDES: {
+      O: {
+        
+      }
+    }
   }
 };
 

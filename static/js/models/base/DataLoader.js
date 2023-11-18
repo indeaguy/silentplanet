@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Earcut } from 'extras/Earcut.js'; // Import the earcut library for triangulation.
-import { ConvexGeometry } from 'three/geometries/ConvexGeometry.js';
+
+// @TODO re-evaluate this
+// import { ConvexGeometry } from 'three/geometries/ConvexGeometry.js';
+
+// @TODO maybe use ray tracing to see if the resulting polygons are inside the original polygon
+// import { RayTracer } from '../models/base/RayTracer.js';
 
 export class DataLoader {
   constructor(url) {
@@ -15,6 +20,18 @@ export class DataLoader {
     return data;
   }
 
+  /**
+   * Subdivides a triangle and creates mesh triangles.
+   *
+   * @param {Array<THREE.Vector3>} triangleVertices - The vertices of the triangle.
+   * @param {number} depth - The depth of subdivision.
+   * @param {number} radius - The radius of the sphere.
+   * @param {number} rise - The distance from the surface of the sphere.
+   * @param {Array<THREE.Mesh>} meshes - An array to store the created meshes.
+   * @param {number} color - The color of the mesh.
+   * @param {number} minEdgeLength - The minimum length of an edge.
+   * @param {THREE.Mesh} polygonMesh - The mesh representing the original polygon.
+   */
   subdivideTriangle(triangleVertices, depth, radius, rise, meshes, color, minEdgeLength, polygonMesh) {
     
     const edgeLengths = [
@@ -30,26 +47,15 @@ export class DataLoader {
     }
 
     if (depth <= 0) {
-        // Base case: No more subdivision needed. Create the mesh triangle.
-
-        // Check if all vertices of the triangle are inside the polygon
-        // @here.. trying to check if the triangle is in the original polygon. but the polygon is not added to the scene yet to check maybe?
-      //   const verticesInside = triangleVertices.map(vertex => {
-      //     const isInside = this.isInsidePolygon(vertex, polygonMesh);
-      //     if (isInside)
-      //     console.log(`Vertex at position (${vertex.x}, ${vertex.y}, ${vertex.z}) is inside polygon: ${isInside}`);
-      //     return isInside;
-      // });
       
-      //if (verticesInside.every(value => value === true)) {
-          const geometry = new THREE.BufferGeometry();
-          const positions = triangleVertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
-          geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-          geometry.setIndex([0, 1, 2]);
-          const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: true });
-          const mesh = new THREE.Mesh(geometry, material);
-          meshes.push(mesh);
-        //}
+        // Base case: No more subdivision needed. Create the mesh triangle.
+        const geometry = new THREE.BufferGeometry();
+        const positions = triangleVertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex([0, 1, 2]);
+        const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: true });
+        const mesh = new THREE.Mesh(geometry, material);
+        meshes.push(mesh);
         return;
     }
   
@@ -69,6 +75,7 @@ export class DataLoader {
     ];
   
     // Recursively subdivide each triangle.
+    // meshes is being passed by reference here!
     for (let t of newTriangles) {
         this.subdivideTriangle(t, depth - 1, radius, rise, meshes, color, minEdgeLength, polygonMesh);
     }
@@ -76,6 +83,17 @@ export class DataLoader {
 
 
 
+/**
+ * Generate a sphere mesh based on the provided data.
+ *
+ * @param {object} data - The data to be mapped onto the sphere.
+ * @param {number} radius - The radius of the sphere.
+ * @param {string} color - The color of the sphere.
+ * @param {number} rise - The rise of the sphere from the radius.
+ * @param {number} subdivisionDepth - The depth of subdivision for the triangles.
+ * @param {number} minEdgeLength - The minimum length of the triangle edges.
+ * @return {object} An object containing the generated meshes and polygonMeshes.
+ */
 mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLength = 0.05) {
   // Calculate the altitude from the radius and rise.
   let altitude = radius + rise;
@@ -124,6 +142,7 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
         const orderedVertices = this.ensureCCW(triangleVertices);
 
         // Use the subdivideTriangle method to handle potential triangle subdivisions.
+         // meshes is being passed by reference here!
         this.subdivideTriangle(orderedVertices, subdivisionDepth, radius, rise, meshes, color, minEdgeLength, polygonMesh);
       }
     }
@@ -165,17 +184,5 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
     const material = new THREE.MeshBasicMaterial({ color: 'blue', wireframe: true });
     return new THREE.Mesh(geometry, material);
   }
-
-  isInsidePolygon(point, polygonMesh) {
-
-    const raycaster = new THREE.Raycaster();
-    const up = new THREE.Vector3(0, 1, 0); // Up direction for raycasting
-
-    raycaster.set(point, up);
-    const intersects = raycaster.intersectObject(polygonMesh);
-    const doesintersect = intersects.length % 2 === 1;
-    return doesintersect;
-  }
-
 
 }
