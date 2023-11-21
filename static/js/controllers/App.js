@@ -1,6 +1,7 @@
 import { Scene } from '../models/base/Scene.js';
 import { Globe } from '../models/base/Globe.js';
 import { DataLoader } from '../models/base/DataLoader.js';
+import { RayTracer } from '../models/base/RayTracer.js';
 
 /**
  * The base application controller
@@ -17,33 +18,23 @@ export class App {
     this.renderer.renderables.push(this.globe);
 
     const loader = new DataLoader('geojson/usa.geojson');
-
-    // Create a Vector2 for the mouse position
-    //const mouse = new THREE.Vector2();
-
-    // Raycaster for mouse picking
-    //const raycaster = new THREE.Raycaster();
-
     
     loader.loadData().then(data => {
       const result = loader.mapDataToSphere(data, config.GLOBE.RADIUS, config.POLYGONS.COLOR, config.POLYGONS.RISE, config.POLYGONS.SUBDIVIDE_DEPTH, config.POLYGONS.MIN_EDGE_LENGTH);
       result.meshes.forEach(mesh => this.renderer.scene.add(mesh));
-      
-      // Add the polygonMeshes to the scene for debugging earclipping
-      result.polygonMeshes.forEach(polygonMesh => this.renderer.scene.add(polygonMesh));
     });
+
+    // a custom raycaster handler
+    this.rayTracer = new RayTracer(this.renderer.scene, this.renderer.camera);
 
     this.renderer.animate();
 
-    window.addEventListener('resize', () => this.renderer.onWindowResize(), false);
-    //window.addEventListener('mousemove', this.onMouseMove, false);
+    this.setupEventListeners();
   }
 
-  onMouseMove(event) {
-    // Calculate mouse position in normalized device coordinates
-    // (-1 to +1) for both components
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+  setupEventListeners() {
+    window.addEventListener('resize', () => this.renderer.onWindowResize(), false);
+    window.addEventListener('mousemove', (event) => this.rayTracer.onMouseMove(event), false);
   }
 
 }

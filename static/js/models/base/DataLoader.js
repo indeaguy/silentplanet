@@ -32,7 +32,7 @@ export class DataLoader {
    * @param {number} minEdgeLength - The minimum length of an edge.
    * @param {THREE.Mesh} polygonMesh - The mesh representing the original polygon.
    */
-  subdivideTriangle(triangleVertices, depth, radius, rise, meshes, color, minEdgeLength, polygonMesh) {
+  subdivideTriangle(triangleVertices, depth, radius, rise, meshes, color, minEdgeLength) {
     
     const edgeLengths = [
         triangleVertices[0].distanceTo(triangleVertices[1]),
@@ -53,7 +53,7 @@ export class DataLoader {
         const positions = triangleVertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.z]);
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geometry.setIndex([0, 1, 2]);
-        const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: true });
+        const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, wireframe: false });
         const mesh = new THREE.Mesh(geometry, material);
         meshes.push(mesh);
         return;
@@ -77,7 +77,7 @@ export class DataLoader {
     // Recursively subdivide each triangle.
     // meshes is being passed by reference here!
     for (let t of newTriangles) {
-        this.subdivideTriangle(t, depth - 1, radius, rise, meshes, color, minEdgeLength, polygonMesh);
+        this.subdivideTriangle(t, depth - 1, radius, rise, meshes, color, minEdgeLength);
     }
 }
 
@@ -101,8 +101,6 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
   // Create an empty array to store mesh objects.
   let meshes = [];
 
-  let polygonMeshes = []; // Array to store polygonMeshes
-
   // Loop through features in the data.
   for (let feature of data.features) {
     if (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon') {
@@ -115,10 +113,6 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
     for (let polygon of polygons) {
       // Extract the coordinates from the polygon data.
       let coordinates = polygon[0];
-
-      // create the first polygon mesh with just geojson to compare
-      let polygonMesh = this.createPolygonMesh(coordinates, radius);
-      polygonMeshes.push(polygonMesh);
 
       // Triangulate the polygon interior using Earcut.
       const triangles = Earcut.triangulate(coordinates.flat());
@@ -142,13 +136,13 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
         const orderedVertices = this.ensureCCW(triangleVertices);
 
         // Use the subdivideTriangle method to handle potential triangle subdivisions.
-         // meshes is being passed by reference here!
-        this.subdivideTriangle(orderedVertices, subdivisionDepth, radius, rise, meshes, color, minEdgeLength, polygonMesh);
+        // meshes is being passed by reference here!
+        this.subdivideTriangle(orderedVertices, subdivisionDepth, radius, rise, meshes, color, minEdgeLength);
       }
     }
   }
 
-  return { meshes: meshes, polygonMeshes: polygonMeshes };
+  return { meshes: meshes };
 }
 
   // Helper function to ensure CCW order for a given triangle.
@@ -165,24 +159,5 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
     }
     return vertices;
 }
-
-  // create a polygon with the original geojson for to compare and remove any outside polygons
-  createPolygonMesh(polygonCoords, radius) {
-    const vertices = polygonCoords.map(coord => {
-      const latRad = coord[1] * (Math.PI / 180);
-      const lonRad = -coord[0] * (Math.PI / 180);
-      const x = radius * Math.cos(latRad) * Math.cos(lonRad);
-      const y = radius * Math.sin(latRad);
-      const z = radius * Math.cos(latRad) * Math.sin(lonRad);
-      return new THREE.Vector3(x, y, z);
-    });
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(vertices);
-    geometry.setIndex(Earcut.triangulate(polygonCoords.flat()));
-
-    //const material = new THREE.MeshBasicMaterial({ visible: false });  // invisible as we're only using it for raycasting
-    const material = new THREE.MeshBasicMaterial({ color: 'blue', wireframe: true });
-    return new THREE.Mesh(geometry, material);
-  }
 
 }

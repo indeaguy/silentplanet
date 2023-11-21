@@ -1,5 +1,6 @@
 import * as THREE from 'three.js';
 import { OrbitControls } from 'three/controls/OrbitControls.js';
+import { RayTracer } from './RayTracer.js';
 
 export class Scene {
 
