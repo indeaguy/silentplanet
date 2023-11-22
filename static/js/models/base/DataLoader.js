@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Earcut } from 'extras/Earcut.js'; // Import the earcut library for triangulation.
+import { mergeBufferGeometries } from 'three/utils/BufferGeometryUtils.js';
 
 // @TODO re-evaluate this
 // import { ConvexGeometry } from 'three/geometries/ConvexGeometry.js';
@@ -99,13 +100,17 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
   let altitude = radius + rise;
 
   // Create an empty array to store mesh objects.
-  let meshes = [];
+  let geoJsonFeatureMeshes = [];
 
   // Loop through features in the data.
   for (let feature of data.features) {
     if (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon') {
       continue;
     }
+
+    //let combinedGeometry = new THREE.BufferGeometry();
+    let meshes = [];
+    let geometries = [];
 
     // Check the geometry type and prepare an array of polygons.
     let polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
@@ -139,10 +144,27 @@ mapDataToSphere(data, radius, color, rise = 0, subdivisionDepth = 3, minEdgeLeng
         // meshes is being passed by reference here!
         this.subdivideTriangle(orderedVertices, subdivisionDepth, radius, rise, meshes, color, minEdgeLength);
       }
+
+      meshes.forEach(mesh => {
+        geometries.push(mesh.geometry);
+      });
+    
+      // Merge all geometries into one
+      let combinedGeometry = mergeBufferGeometries(geometries, false);
+
+      // Create a single mesh with the combined geometry
+      let combinedMesh = new THREE.Mesh(combinedGeometry, new THREE.MeshBasicMaterial({ color: color }));
+
+      // Assign the properties from the geojson to the mesh
+      if (feature.properties.name) {
+        combinedMesh.name = feature.properties.name;
+      }
+
+      geoJsonFeatureMeshes.push(combinedMesh)
     }
   }
 
-  return { meshes: meshes };
+  return { meshes: geoJsonFeatureMeshes };
 }
 
   // Helper function to ensure CCW order for a given triangle.
