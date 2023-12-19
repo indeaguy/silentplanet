@@ -11,16 +11,16 @@ import { RayTracer } from '../models/base/RayTracer.js';
 export class App {
   constructor(config) {
     
-    this.renderer = new Scene(config.CAMERA, config.SCENE);
 
-    this.globe = new Globe(config.GLOBE, this.renderer); 
+    this.renderer = new Scene(config.CAMERA, config.SCENE);
+    this.globe = new Globe(config.SPHERE, this.renderer); 
     this.globe.createSphere();
     this.renderer.renderables.push(this.globe);
 
     const loader = new DataLoader('geojson/usa.geojson');
     
     loader.loadData().then(data => {
-      const result = loader.mapDataToSphere(data, config.GLOBE.RADIUS, config.POLYGONS.COLOR, config.POLYGONS.RISE, config.POLYGONS.SUBDIVIDE_DEPTH, config.POLYGONS.MIN_EDGE_LENGTH);
+      const result = loader.mapDataToSphere(data, config.SPHERE.RADIUS, config.POLYGONS.COLOR, config.POLYGONS.RISE, config.POLYGONS.SUBDIVIDE_DEPTH, config.POLYGONS.MIN_EDGE_LENGTH);
       result.meshes.forEach(mesh => this.renderer.scene.add(mesh));
     });
 

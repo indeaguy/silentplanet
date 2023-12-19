@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Smashface</title>
+    <title>Silent Planet</title>
     <style>
       body { margin: 0; }
       canvas { width: 100%; height: 100% }
@@ -16,12 +16,15 @@
           "three": "https://unpkg.com/three@0.153.0/build/three.module.js",
           "three.js": "https://unpkg.com/three@0.153.0/build/three.module.js",
           "three/": "https://unpkg.com/three@0.153.0/examples/jsm/",
-          "extras/": "https://unpkg.com/three@0.153.0/src/extras/"
+          "extras/": "https://unpkg.com/three@0.153.0/src/extras/",
+          "vue": "https://unpkg.com/vue@3/dist/vue.global.js"
         }
       }
       </script>
   
     <script type="module-shim" src="static/js/main.js"></script>
+    <div id="coordinateDisplay" style="position: fixed; bottom: 10px; left: 10px; color: white;">X: 0, Y: 0</div>
+
     <!-- <script src="static/node_modules/three/build/three.module.js"></script> -->
     <!-- <script type="module" src="static/js/main.js"></script> -->
   </body>

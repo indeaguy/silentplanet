@@ -1,6 +1,7 @@
 import { App } from './controllers/App.js';
 
 //@TODO override these with json provided from somewhere  
+// this will be the API for this app.
 const CONFIG = {
   SCENE: {
     WIDTH_PERCENTAGE: 1, // 100% of the window's width, also used for camera aspect ratio
@@ -9,12 +10,12 @@ const CONFIG = {
   CAMERA: {
     FOV: 75, // degrees visible in the field of view
     MAX_VISIBLE: 1000, // maximum 'units' away objects will be visible
-    MIN_VISIBLE: 0.1, // minimum 'units' away objects will be visible
+    MIN_VISIBLE: .1, // minimum 'units' away objects will be visible
     DEFAULT_POINT_X: 1,
     DEFAULT_POINT_Y: 3,
     DEFAULT_POINT_Z: 10,
   },
-  GLOBE: {
+  SPHERE: {
     RADIUS: 1,
     FILL_COLOUR: 0x000000,
     WIDTH_SEGMENTS: 20, // pizza slices in the sphere
@@ -43,7 +44,7 @@ const CONFIG = {
         FADE_END: 0.8,
         FADE_SPEED: 0.02
       }
-    }
+    } // end GRIDS
   },
   POLYGONS: {
     RISE: 0, // how high off the sphere the polygons rise
@@ -54,9 +55,9 @@ const CONFIG = {
       O: {
         
       }
-    }
-  }
-};
+    } // end POLYGONS
+  } // end SPHERE
+}; // end CONFIG
 
 new App(CONFIG);
 

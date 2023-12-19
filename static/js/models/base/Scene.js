@@ -25,6 +25,7 @@ export class Scene {
       window.innerWidth * sceneConfig.WIDTH_PERCENTAGE,
       window.innerHeight * sceneConfig.HEIGHT_PERCENTAGE
     );
+    // @TODO 
     this.renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(this.renderer.domElement);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
